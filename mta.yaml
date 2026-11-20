@@ -1,0 +1,61 @@
+_schema-version: 3.3.0
+ID: ses-management
+version: 1.0.0
+description: "Service Entry Sheet Management"
+
+parameters:
+  enable-parallel-deployments: true
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+
+modules:
+  - name: ses-management-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      instances: 1
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: ses-management-auth
+      - name: ses-management-db
+      - name: ses-management-destination
+
+  - name: ses-management-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: ses-management-db
+
+resources:
+  - name: ses-management-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      config:
+        xsappname: ses-management-${org}-${space}
+        tenant-mode: dedicated
+
+  - name: ses-management-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+
+  - name: ses-management-destination
+    type: org.cloudfoundry.existing-service
+    parameters:
+      service-name: purchase-request-management-destination
